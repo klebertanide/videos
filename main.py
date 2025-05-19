@@ -36,7 +36,6 @@ with open(CANAL_DIR / "voz.json") as f:
 MUSICAS_DIR = CANAL_DIR / "musicas"
 
 # Funções auxiliares
-
 def gerar_texto():
     payload = {
         "model": "gpt-4-turbo",
@@ -47,7 +46,6 @@ def gerar_texto():
     resp = requests.post("https://api.openai.com/v1/chat/completions", json=payload, headers=headers)
     resp.raise_for_status()
     return resp.json()["choices"][0]["message"]["content"].strip()
-
 
 def gerar_audio(texto, idx):
     payload = {
@@ -68,7 +66,6 @@ def gerar_audio(texto, idx):
         f.write(resp.content)
     return audio_path
 
-
 def obter_duracao(audio_path):
     cmd = [
         "ffprobe", "-v", "error",
@@ -78,7 +75,6 @@ def obter_duracao(audio_path):
     ]
     output = subprocess.check_output(cmd).decode().strip()
     return float(output)
-
 
 def gerar_imagens(texto, duracao):
     n_imgs = max(1, int(duracao // 4))
@@ -98,11 +94,9 @@ def gerar_imagens(texto, duracao):
         sleep(0.5)
     return imagens
 
-
 def escolher_musica():
     musicas = list(MUSICAS_DIR.glob("*.mp3"))
     return random.choice(musicas) if musicas else None
-
 
 def montar_video(idx, audio_path, imagens, musica_path):
     base_video = VIDEOS_DIR / f"base_{idx}.mp4"
