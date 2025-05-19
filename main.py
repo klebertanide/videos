@@ -1,4 +1,3 @@
-```python
 # main.py - Fábrica de Shorts Cristãos Motivacionais totalmente automatizada
 # Gera 15 vídeos por dia com texto, narração, imagens, música e upload opcional
 
@@ -10,6 +9,8 @@ from datetime import datetime
 from pathlib import Path
 from time import sleep
 import subprocess
+
+print("🚀 Iniciando pipeline de geração de vídeos...")
 
 # Diretórios
 ROOT = Path(__file__).parent
@@ -86,9 +87,7 @@ def gerar_imagens(texto, duracao):
         body = {"prompt": texto, **visual_config}
         headers = {"Authorization": f"Bearer {config['ideogram_api_key']}", "Content-Type": "application/json"}
         resp = requests.post("https://api.ideogram.ai/v1/generate", json=body, headers=headers)
-        if resp.status_code != 200:
-            print(f"Falha ao gerar imagem {i+1}: {resp.text}")
-            continue
+        resp.raise_for_status()
         url = resp.json().get("image_url")
         if url:
             img_data = requests.get(url).content
@@ -106,24 +105,21 @@ def escolher_musica():
 
 
 def montar_video(idx, audio_path, imagens, musica_path):
-    # Monta sequência de imagens concatenadas
+    base_video = VIDEOS_DIR / f"base_{idx}.mp4"
+    concat_file = VIDEOS_DIR / f"in_{idx}.txt"
     dur = obter_duracao(audio_path)
     tempo = dur / len(imagens) if imagens else dur
-    concat_file = VIDEOS_DIR / f"in_{idx}.txt"
     with open(concat_file, "w") as f:
         for img in imagens:
             f.write(f"file '{img}'\n")
             f.write(f"duration {tempo}\n")
         if imagens:
             f.write(f"file '{imagens[-1]}'\n")
-    base_video = VIDEOS_DIR / f"base_{idx}.mp4"
     subprocess.run([
         "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(concat_file),
         "-vf", "scale=1080:1920,format=yuv420p",
         str(base_video)
     ], check=True)
-
-    # Mixar áudio e música de fundo
     final = VIDEOS_DIR / f"video_{idx}.mp4"
     cmd = ["ffmpeg", "-y", "-i", str(base_video), "-i", str(audio_path)]
     if musica_path:
@@ -146,4 +142,3 @@ for i in range(NUM_VIDEOS):
         print(f"Vídeo {i+1} concluído.")
     except Exception as e:
         print(f"Erro no vídeo {i+1}: {e}")
-```
