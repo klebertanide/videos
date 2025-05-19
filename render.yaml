@@ -1,0 +1,14 @@
+
+services:
+  - type: worker
+    name: shorts-cristaos-worker
+    runtime: python
+    buildCommand: ""
+    startCommand: "python main.py"
+    autoDeploy: true
+    plan: starter
+
+cron:
+  - name: gerar_videos_diarios
+    schedule: "@daily"
+    command: "python main.py"

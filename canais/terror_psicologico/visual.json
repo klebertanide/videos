@@ -1,0 +1,7 @@
+{
+  "style": "REALISTIC",
+  "aspect_ratio": "ASPECT_9_16",
+  "magic_prompt": true,
+  "color_palette": "light",
+  "tags_extra": ["sunlight", "natural"]
+}
