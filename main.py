@@ -1,7 +1,6 @@
 # main.py - Fábrica de Shorts Cristãos Motivacionais totalmente automatizada
 # Gera 15 vídeos por dia com texto, narração, imagens, música e upload opcional
 
-from dotenv import load_dotenv
 import os
 import json
 import requests
@@ -11,29 +10,23 @@ from pathlib import Path
 from time import sleep
 import subprocess
 
-# Carregar variáveis de ambiente
-load_dotenv()
-OPENAI_KEY      = os.getenv("OPENAI_API_KEY")
-ELEVEN_KEY      = os.getenv("ELEVENLABS_API_KEY")
-IDEOGRAM_KEY    = os.getenv("IDEOGRAM_API_KEY")
-
-if not OPENAI_KEY:
-    raise RuntimeError("⚠️ OPENAI_API_KEY não definido!")
-if not ELEVEN_KEY:
-    raise RuntimeError("⚠️ ELEVENLABS_API_KEY não definido!")
-if not IDEOGRAM_KEY:
-    raise RuntimeError("⚠️ IDEOGRAM_API_KEY não definido!")
-
 print("🚀 Iniciando pipeline de geração de vídeos...")
 
+# Debug: verifique se as env vars estão carregadas
+print(f"DEBUG: OPENAI_API_KEY set? {bool(OPENAI_KEY)}")
+print(f"DEBUG: ELEVENLABS_API_KEY set? {bool(ELEVEN_KEY)}")
+print(f"DEBUG: IDEOGRAM_API_KEY set? {bool(IDEOGRAM_KEY)}")
+
 # Diretórios
-ROOT        = Path(__file__).parent
-CONFIG_DIR  = ROOT / "config"
-CANAIS_DIR  = ROOT / "canais"
-VIDEOS_DIR  = ROOT / "videos" / datetime.now().strftime("%Y-%m-%d")
+ROOT = Path(__file__).parent
+CONFIG_DIR = ROOT / "config"
+CANAIS_DIR = ROOT / "canais"
+VIDEOS_DIR = ROOT / "videos" / datetime.now().strftime("%Y-%m-%d")
 VIDEOS_DIR.mkdir(parents=True, exist_ok=True)
 
-# Carregar canal ativo
+# Carregar configuração principal e canal ativo
+with open(CONFIG_DIR / "config.json") as f:
+    config = json.load(f)
 with open(CONFIG_DIR / "canal_ativo.txt") as f:
     canal = f.read().strip()
 CANAL_DIR = CANAIS_DIR / canal
@@ -48,16 +41,18 @@ with open(CANAL_DIR / "voz.json") as f:
 MUSICAS_DIR = CANAL_DIR / "musicas"
 
 # Funções auxiliares
+
 def gerar_texto():
     payload = {
         "model": "gpt-4-turbo",
         "messages": [{"role": "user", "content": prompt_base}],
         "max_tokens": 150
     }
-    headers = {"Authorization": f"Bearer {OPENAI_KEY}"}
+    headers = {"Authorization": f"Bearer {config['openai_api_key']}"}
     resp = requests.post("https://api.openai.com/v1/chat/completions", json=payload, headers=headers)
     resp.raise_for_status()
     return resp.json()["choices"][0]["message"]["content"].strip()
+
 
 def gerar_audio(texto, idx):
     payload = {
@@ -70,13 +65,14 @@ def gerar_audio(texto, idx):
             "use_speaker_boost": voz_config.get("use_speaker_boost", True)
         }
     }
-    headers = {"xi-api-key": ELEVEN_KEY, "Content-Type": "application/json"}
+    headers = {"xi-api-key": config['elevenlabs_api_key'], "Content-Type": "application/json"}
     resp = requests.post(f"https://api.elevenlabs.io/v1/text-to-speech/{voz_config['voice_id']}", json=payload, headers=headers)
     resp.raise_for_status()
     audio_path = VIDEOS_DIR / f"audio_{idx}.mp3"
     with open(audio_path, "wb") as f:
         f.write(resp.content)
     return audio_path
+
 
 def obter_duracao(audio_path):
     cmd = [
@@ -88,12 +84,13 @@ def obter_duracao(audio_path):
     output = subprocess.check_output(cmd).decode().strip()
     return float(output)
 
+
 def gerar_imagens(texto, duracao):
     n_imgs = max(1, int(duracao // 4))
     imagens = []
     for i in range(n_imgs):
         body = {"prompt": texto, **visual_config}
-        headers = {"Authorization": f"Bearer {IDEOGRAM_KEY}", "Content-Type": "application/json"}
+        headers = {"Authorization": f"Bearer {config['ideogram_api_key']}", "Content-Type": "application/json"}
         resp = requests.post("https://api.ideogram.ai/v1/generate", json=body, headers=headers)
         resp.raise_for_status()
         url = resp.json().get("image_url")
@@ -106,9 +103,11 @@ def gerar_imagens(texto, duracao):
         sleep(0.5)
     return imagens
 
+
 def escolher_musica():
     musicas = list(MUSICAS_DIR.glob("*.mp3"))
     return random.choice(musicas) if musicas else None
+
 
 def montar_video(idx, audio_path, imagens, musica_path):
     base_video = VIDEOS_DIR / f"base_{idx}.mp4"
@@ -139,11 +138,11 @@ NUM_VIDEOS = 15
 for i in range(NUM_VIDEOS):
     print(f"[{i+1}/{NUM_VIDEOS}] Gerando vídeo...")
     try:
-        texto   = gerar_texto()
-        audio   = gerar_audio(texto, i)
-        dur     = obter_duracao(audio)
-        imgs    = gerar_imagens(texto, dur)
-        musica  = escolher_musica()
+        texto = gerar_texto()
+        audio = gerar_audio(texto, i)
+        dur = obter_duracao(audio)
+        imgs = gerar_imagens(texto, dur)
+        musica = escolher_musica()
         montar_video(i, audio, imgs, musica)
         print(f"Vídeo {i+1} concluído.")
     except Exception as e:
